@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Subtitle Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="backdrop backdrop-a"></div>
+    <div class="backdrop backdrop-b"></div>
+
+    <main class="shell">
+      <section class="hero panel reveal">
+        <div>
+          <p class="eyebrow">Automatic video transcriber</p>
+          <h1>Upload a video, transcribe it, and preview subtitles sentence by sentence.</h1>
+          <p class="lede">
+            This app extracts audio, runs a local Whisper model on it, and shows full sentences on top of the video with a highlighted current word and color controls.
+          </p>
+        </div>
+        <div class="hero-meta">
+          <div class="meta-card">
+            <span class="meta-label">Model</span>
+            <strong>Whisper tiny</strong>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Timing</span>
+            <strong>Word-level</strong>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Export</span>
+            <strong>WebVTT</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <aside class="panel controls reveal">
+          <form id="uploadForm" class="stack">
+            <label class="field">
+              <span>Video file</span>
+              <input id="videoFile" type="file" accept="video/*" />
+            </label>
+
+            <button class="primary-btn" id="transcribeBtn" type="submit">
+              Transcribe video
+            </button>
+          </form>
+
+          <div class="swatches">
+            <label class="field color-field">
+              <span>Subtitle color</span>
+              <input id="subtitleColor" type="color" value="#F8FAFC" />
+            </label>
+            <label class="field color-field">
+              <span>Highlighted word color</span>
+              <input id="highlightColor" type="color" value="#FFB703" />
+            </label>
+          </div>
+
+          <div class="sliders">
+            <label class="field range-field">
+              <span>Subtitle size</span>
+              <input id="subtitleSize" type="range" min="0.9" max="2.1" step="0.05" value="1.35" />
+            </label>
+            <label class="field range-field">
+              <span>Subtitle height</span>
+              <input id="subtitleOffset" type="range" min="8" max="34" step="1" value="22" />
+            </label>
+          </div>
+
+          <div class="toggles">
+            <label class="toggle-row">
+              <input id="subtitleBackground" type="checkbox" checked />
+              <span>Show subtitle background</span>
+            </label>
+            <label class="toggle-row">
+              <input id="subtitleBorder" type="checkbox" />
+              <span>Show subtitle border</span>
+            </label>
+            <label class="toggle-row">
+              <input id="highlightBackground" type="checkbox" />
+              <span>Show highlighted word background</span>
+            </label>
+          </div>
+
+          <div class="swatches">
+            <label class="field color-field">
+              <span>Highlighted word background color</span>
+              <input id="highlightBackgroundColor" type="color" value="#FFB703" />
+            </label>
+          </div>
+
+          <div class="sliders">
+            <label class="field range-field">
+              <span>Highlighted word background opacity</span>
+              <input id="highlightBackgroundOpacity" type="range" min="0" max="100" step="1" value="35" />
+            </label>
+          </div>
+
+          <button class="secondary-btn" id="downloadVtt" type="button" disabled>
+            Download WebVTT
+          </button>
+
+          <div class="status-box">
+            <span class="status-label">Status</span>
+            <p id="statusText">Choose a video file to begin.</p>
+          </div>
+        </aside>
+
+        <section class="panel preview reveal">
+          <div class="stage">
+            <div class="preview-badge">Live subtitle preview</div>
+            <video id="video" controls playsinline></video>
+            <div class="subtitle-overlay">
+              <div id="subtitleLine" class="subtitle-line"></div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="panel transcript reveal">
+        <div class="section-head">
+          <h2>Transcript</h2>
+          <p>Each sentence appears as soon as it starts, then the next sentence replaces it.</p>
+        </div>
+        <p id="transcriptText" class="transcript-text">
+          Your transcript will appear here after the first run.
+        </p>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
