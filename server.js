@@ -31,7 +31,7 @@ let transcriberPromise;
 
 function getTranscriber() {
   if (!transcriberPromise) {
-    transcriberPromise = pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
+    transcriberPromise = pipeline('automatic-speech-recognition', 'Xenova/whisper-base');
   }
 
   return transcriberPromise;
@@ -39,7 +39,17 @@ function getTranscriber() {
 
 function runCommand(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: 'ignore', ...options });
+    const child = spawn(command, args, {
+      ...options,
+      stdio: ['ignore', 'ignore', 'pipe']
+    });
+
+    let stderr = '';
+    if (child.stderr) {
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString();
+      });
+    }
 
     child.once('error', reject);
     child.once('close', (code) => {
@@ -48,26 +58,121 @@ function runCommand(command, args, options = {}) {
         return;
       }
 
-      reject(new Error(`Command failed with exit code ${code}`));
+      const errorMessage = stderr.trim() || `Command failed with exit code ${code}`;
+      reject(new Error(errorMessage));
     });
   });
 }
 
 async function extractAudio(videoPath, audioPath) {
   const ffmpegExecutable = ffmpegPath || 'ffmpeg';
-  await runCommand(ffmpegExecutable, [
-    '-y',
-    '-i',
-    videoPath,
-    '-vn',
-    '-ac',
-    '1',
-    '-ar',
-    '16000',
-    '-f',
-    'wav',
-    audioPath,
-  ]);
+  
+  try {
+    // Attempt direct extraction
+    await runCommand(ffmpegExecutable, [
+      '-y',
+      '-err_detect',
+      'ignore_err',
+      '-fflags',
+      '+discardcorrupt',
+      '-i',
+      videoPath,
+      '-vn',
+      '-ac',
+      '1',
+      '-ar',
+      '16000',
+      '-max_error_rate',
+      '1.0',
+      '-f',
+      'wav',
+      audioPath,
+    ]);
+  } catch (directError) {
+    console.warn('Direct audio extraction failed. Checking if partial audio was written...', directError.message);
+    
+    // Check if a substantial audio file was already written before the crash
+    try {
+      const stats = await import('fs/promises').then(({ stat }) => stat(audioPath));
+      if (stats.size > 10240) {
+        console.warn(`Partial audio file found (${stats.size} bytes). Fixing WAV headers and continuing...`);
+        const tempWavPath = audioPath.replace(/\.wav$/, '.temp.wav');
+        await import('fs/promises').then(({ rename }) => rename(audioPath, tempWavPath));
+        await runCommand(ffmpegExecutable, [
+          '-y',
+          '-i',
+          tempWavPath,
+          '-c:a',
+          'copy',
+          audioPath,
+        ]);
+        await rm(tempWavPath, { force: true }).catch(() => {});
+        return; // Success!
+      }
+    } catch (statError) {
+      console.warn('No substantial partial audio file found. Trying two-step fallback...');
+    }
+
+    // Fallback: Extract raw stream first to strip buggy container metadata, then decode
+    const tempAacPath = audioPath.replace(/\.wav$/, '.aac');
+    try {
+      // Step 1: Copy audio stream to raw AAC file without decoding (safe from decoder aborts)
+      await runCommand(ffmpegExecutable, [
+        '-y',
+        '-i',
+        videoPath,
+        '-vn',
+        '-c:a',
+        'copy',
+        tempAacPath,
+      ]);
+
+      // Step 2: Decode raw AAC file to target WAV file
+      await runCommand(ffmpegExecutable, [
+        '-y',
+        '-err_detect',
+        'ignore_err',
+        '-fflags',
+        '+discardcorrupt',
+        '-i',
+        tempAacPath,
+        '-ac',
+        '1',
+        '-ar',
+        '16000',
+        '-max_error_rate',
+        '1.0',
+        '-f',
+        'wav',
+        audioPath,
+      ]);
+    } catch (fallbackError) {
+      // If even fallback fails, check if fallback wrote a partial wav file
+      try {
+        const stats = await import('fs/promises').then(({ stat }) => stat(audioPath));
+        if (stats.size > 10240) {
+          console.warn(`Fallback produced a partial audio file (${stats.size} bytes). Fixing WAV headers and continuing...`);
+          const tempWavPath = audioPath.replace(/\.wav$/, '.temp.wav');
+          await import('fs/promises').then(({ rename }) => rename(audioPath, tempWavPath));
+          await runCommand(ffmpegExecutable, [
+            '-y',
+            '-i',
+            tempWavPath,
+            '-c:a',
+            'copy',
+            audioPath,
+          ]);
+          await rm(tempWavPath, { force: true }).catch(() => {});
+          return; // Success!
+        }
+      } catch (fallbackStatError) {}
+
+      throw new Error(`Audio extraction failed.\nDirect method error: ${directError.message}\nFallback method error: ${fallbackError.message}`);
+    } finally {
+      // Clean up the temporary raw AAC file if it was created
+      await rm(tempAacPath, { force: true }).catch(() => {});
+    }
+  }
 }
 
 async function loadAudioData(audioPath) {
@@ -168,7 +273,12 @@ function toAssColor(hex) {
   const safeRed = Number.isFinite(red) ? red : 255;
   const safeGreen = Number.isFinite(green) ? green : 255;
   const safeBlue = Number.isFinite(blue) ? blue : 255;
-  return `&H00${String(safeBlue).padStart(2, '0')}${String(safeGreen).padStart(2, '0')}${String(safeRed).padStart(2, '0')}&`;
+  
+  const bHex = safeBlue.toString(16).padStart(2, '0').toUpperCase();
+  const gHex = safeGreen.toString(16).padStart(2, '0').toUpperCase();
+  const rHex = safeRed.toString(16).padStart(2, '0').toUpperCase();
+  
+  return `&H00${bHex}${gHex}${rHex}&`;
 }
 
 function parseBoolean(value, fallback = false) {
@@ -196,10 +306,10 @@ function buildAssFile(cues, options) {
     showBorder,
   } = options;
 
-  const outlineWidth = showBorder ? borderWidth : 0;
+  const outlineWidth = borderWidth;
   const borderStyle = showBackground ? 3 : 1;
   const backColour = showBackground ? '&H7F000000&' : '&H00000000&';
-  const primaryColour = toAssColor(activeWordDifferentColor ? activeWordColor : subtitleColor);
+  const primaryColour = toAssColor(subtitleColor);
   const secondaryColour = toAssColor(subtitleColor);
   const outlineColour = toAssColor(borderColor);
   const style = [
@@ -220,7 +330,7 @@ function buildAssFile(cues, options) {
     '0',
     String(borderStyle),
     String(outlineWidth),
-    '0',
+    '1',
     '2',
     '30',
     '30',
@@ -243,31 +353,61 @@ function buildAssFile(cues, options) {
     'Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text',
   ];
 
-  const events = cues.flatMap((cue) => {
-    return cue.words.map((word, index) => {
-      const start = formatAssTime(word.start);
-      const nextWord = cue.words[index + 1] ?? null;
-      const endTime = nextWord ? nextWord.start : cue.end;
-      const end = formatAssTime(Math.max(endTime, word.end + 0.08));
-      const sentence = cue.words
-        .map((currentWord, currentIndex) => {
-          const text = escapeAssText(currentWord.text);
-          return currentIndex === index && activeWordDifferentColor
-            ? `{\\c${toAssColor(activeWordColor)}}${text}{\\c${primaryColour}}`
-            : text;
-        })
-        .join(' ');
+  const events = [];
 
-      return `Dialogue: 0,${start},${end},Default,,0,0,0,,${sentence}`;
-    });
-  });
+  for (const cue of cues) {
+    if (activeWordDifferentColor && Array.isArray(cue.words) && cue.words.length > 0) {
+      const activeWordAssColor = toAssColor(activeWordColor);
+      const defaultAssColor = toAssColor(subtitleColor);
+
+      for (let i = 0; i < cue.words.length; i++) {
+        const activeWord = cue.words[i];
+        
+        // Start time of this word highlight interval
+        const startSec = i === 0 ? cue.start : activeWord.start;
+        
+        // End time of this word highlight interval
+        const nextWord = cue.words[i + 1];
+        const endSec = nextWord ? nextWord.start : Math.max(cue.end, activeWord.end);
+
+        const start = formatAssTime(startSec);
+        const end = formatAssTime(Math.max(endSec, startSec + 0.1));
+
+        const textParts = cue.words.map((w) => {
+          if (w === activeWord) {
+            return `{\\c${activeWordAssColor}}${escapeAssText(w.text)}{\\c${defaultAssColor}}`;
+          }
+          return escapeAssText(w.text);
+        });
+
+        // Rejoin with spaces, fixing punctuation spacing if necessary
+        const text = textParts.join(' ').replace(/\s+([.,!?;:…])/g, '$1');
+        events.push(`Dialogue: 0,${start},${end},Default,,0,0,0,,${text}`);
+      }
+    } else {
+      const start = formatAssTime(cue.start);
+      const end = formatAssTime(Math.max(cue.end, cue.start + 0.2));
+      const text = escapeAssText(cue.text || '');
+      events.push(`Dialogue: 0,${start},${end},Default,,0,0,0,,${text}`);
+    }
+  }
 
   return `${header.join('\n')}\n${events.join('\n')}`;
 }
 
 function runRenderCommand(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: 'ignore', ...options });
+    const child = spawn(command, args, {
+      ...options,
+      stdio: ['ignore', 'ignore', 'pipe']
+    });
+
+    let stderr = '';
+    if (child.stderr) {
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString();
+      });
+    }
 
     child.once('error', reject);
     child.once('close', (code) => {
@@ -276,7 +416,8 @@ function runRenderCommand(command, args, options = {}) {
         return;
       }
 
-      reject(new Error(`Video render failed with exit code ${code}`));
+      const errorMessage = stderr.trim() || `Video render failed with exit code ${code}`;
+      reject(new Error(errorMessage));
     });
   });
 }
@@ -351,6 +492,7 @@ app.post('/api/transcribe', upload.single('video'), async (request, response) =>
       cues,
     });
   } catch (error) {
+    console.error('Transcription error details:', error);
     const message = error instanceof Error ? error.message : 'Transcription failed.';
     response.status(500).json({ error: message });
   } finally {

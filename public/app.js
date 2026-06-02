@@ -14,6 +14,7 @@ const subtitleOffsetInput = document.getElementById('subtitleOffset');
 const subtitleBackgroundInput = document.getElementById('subtitleBackground');
 const subtitleBorderInput = document.getElementById('subtitleBorder');
 const subtitleBorderColorInput = document.getElementById('subtitleBorderColor');
+const subtitleBorderWidthInput = document.getElementById('subtitleBorderWidth');
 const highlightBackgroundInput = document.getElementById('highlightBackground');
 const highlightBackgroundColorInput = document.getElementById('highlightBackgroundColor');
 const highlightBackgroundOpacityInput = document.getElementById('highlightBackgroundOpacity');
@@ -128,6 +129,7 @@ function renderSubtitle() {
   const highlightBackgroundColor = highlightBackgroundColorInput.value;
   const highlightBackgroundOpacity = Number(highlightBackgroundOpacityInput.value) / 100;
   const subtitleBorderColor = subtitleBorderColorInput.value;
+  const subtitleBorderWidth = subtitleBorderWidthInput.value;
 
   const { red, green, blue } = hexToRgb(highlightBackgroundColor);
   const highlightBackground = hasHighlightBackground ? `rgba(${red}, ${green}, ${blue}, ${highlightBackgroundOpacity})` : 'transparent';
@@ -140,6 +142,7 @@ function renderSubtitle() {
   subtitleLine.style.setProperty('--subtitle-shadow', hasBackground || hasBorder ? '0 16px 40px rgba(0, 0, 0, 0.3)' : 'none');
   subtitleLine.style.setProperty('--highlight-word-background', highlightBackground);
   subtitleLine.style.setProperty('--subtitle-border-color', subtitleBorderColor);
+  subtitleLine.style.setProperty('--subtitle-border-width', `${subtitleBorderWidth}px`);
 
   subtitleLine.innerHTML = cue.words
     .map((word) => {
@@ -170,6 +173,7 @@ subtitleOffsetInput.addEventListener('input', renderSubtitle);
 subtitleBackgroundInput.addEventListener('input', renderSubtitle);
 subtitleBorderInput.addEventListener('input', renderSubtitle);
 subtitleBorderColorInput.addEventListener('input', renderSubtitle);
+subtitleBorderWidthInput.addEventListener('input', renderSubtitle);
 highlightBackgroundInput.addEventListener('input', renderSubtitle);
 highlightBackgroundColorInput.addEventListener('input', renderSubtitle);
 highlightBackgroundOpacityInput.addEventListener('input', renderSubtitle);
@@ -225,7 +229,7 @@ downloadVideoButton.addEventListener('click', async () => {
   formData.append('activeWordColor', highlightColorInput.value);
   formData.append('activeWordDifferentColor', String(useActiveWordColorInput.checked));
   formData.append('borderColor', subtitleBorderColorInput.value);
-  formData.append('borderWidth', '2');
+  formData.append('borderWidth', subtitleBorderWidthInput.value);
   formData.append('showBackground', String(subtitleBackgroundInput.checked));
   formData.append('showBorder', String(subtitleBorderInput.checked));
 
@@ -301,7 +305,7 @@ form.addEventListener('submit', async (event) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Transcription failed.';
     setStatus(message);
-    transcriptText.textContent = 'The transcription could not be completed.';
+    transcriptText.textContent = `The transcription could not be completed.\nReason: ${message}`;
   } finally {
     transcribeButton.disabled = false;
   }

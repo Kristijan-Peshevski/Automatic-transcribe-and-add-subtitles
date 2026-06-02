@@ -392,19 +392,19 @@ input[type='file']::file-selector-button {
 
 .subtitle-word {
   display: inline-block;
-  margin-right: 0.28em;
+  padding: 0.08em 0.18em;
+  margin-right: 0.1em;
   opacity: 0.9;
-  -webkit-text-stroke: 1.5px var(--subtitle-border-color, transparent);
+  border-radius: 6px;
+  background: transparent;
+  transition: background-color 150ms ease, color 150ms ease;
+  -webkit-text-stroke: var(--subtitle-border-width, 1.5px) var(--subtitle-border-color, transparent);
   paint-order: stroke fill;
 }
 
 .subtitle-word.active {
   opacity: 1;
   background: var(--highlight-word-background, transparent);
-  border-radius: 0;
-  padding: 0.08em 0.18em;
-  margin: 0;
-  display: inline-block;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
