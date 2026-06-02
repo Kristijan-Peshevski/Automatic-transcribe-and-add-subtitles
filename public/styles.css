@@ -132,6 +132,15 @@ h1 {
   gap: 12px;
 }
 
+.stack-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .meta-card {
   padding: 16px 14px;
   border-radius: 18px;
@@ -184,6 +193,22 @@ h1 {
   color: var(--text);
 }
 
+select {
+  width: 100%;
+  min-height: 58px;
+  padding: 0 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+}
+
+select:focus {
+  outline: 2px solid rgba(94, 234, 212, 0.45);
+  outline-offset: 2px;
+}
+
 input[type='file'] {
   width: 100%;
   padding: 16px;
@@ -208,6 +233,10 @@ input[type='file']::file-selector-button {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.swatches.one-up {
+  grid-template-columns: 1fr;
 }
 
 .sliders {
@@ -271,6 +300,10 @@ input[type='file']::file-selector-button {
 .secondary-btn {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
+}
+
+.secondary-action {
+  width: 100%;
 }
 
 .primary-btn:hover,
@@ -354,12 +387,15 @@ input[type='file']::file-selector-button {
   font-size: var(--subtitle-size, clamp(1rem, 2vw, 1.6rem));
   line-height: 1.35;
   min-height: 64px;
+  font-family: var(--subtitle-font, 'Space Grotesk', sans-serif);
 }
 
 .subtitle-word {
   display: inline-block;
   margin-right: 0.28em;
   opacity: 0.9;
+  -webkit-text-stroke: 1.5px var(--subtitle-border-color, transparent);
+  paint-order: stroke fill;
 }
 
 .subtitle-word.active {
@@ -371,7 +407,6 @@ input[type='file']::file-selector-button {
   display: inline-block;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
-  text-shadow: 0 0 18px color-mix(in srgb, var(--highlight-color) 45%, transparent);
 }
 
 .section-head {

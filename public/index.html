@@ -22,7 +22,7 @@
           <p class="eyebrow">Automatic video transcriber</p>
           <h1>Upload a video, transcribe it, and preview subtitles sentence by sentence.</h1>
           <p class="lede">
-            This app extracts audio, runs a local Whisper model on it, and shows full sentences on top of the video with a highlighted current word and color controls.
+            This app extracts audio, runs a local Whisper model on it, and gives you a live subtitle preview plus an exported MP4 with burned-in subtitles.
           </p>
         </div>
         <div class="hero-meta">
@@ -59,9 +59,33 @@
               <span>Subtitle color</span>
               <input id="subtitleColor" type="color" value="#F8FAFC" />
             </label>
-            <label class="field color-field">
-              <span>Highlighted word color</span>
-              <input id="highlightColor" type="color" value="#FFB703" />
+          </div>
+
+          <div class="stack-card">
+            <label class="toggle-row">
+              <input id="useActiveWordColor" type="checkbox" checked />
+              <span>Use different active word color</span>
+            </label>
+            <div class="swatches one-up">
+              <label class="field color-field">
+                <span>Active word color</span>
+                <input id="highlightColor" type="color" value="#FFB703" />
+              </label>
+            </div>
+          </div>
+
+          <div class="stack-card">
+            <label class="field">
+              <span>Subtitle font</span>
+              <select id="subtitleFont">
+                <option value="Segoe UI">Segoe UI</option>
+                <option value="Arial">Arial</option>
+                <option value="Verdana">Verdana</option>
+                <option value="Trebuchet MS">Trebuchet MS</option>
+                <option value="Georgia">Georgia</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Courier New">Courier New</option>
+              </select>
             </label>
           </div>
 
@@ -93,6 +117,13 @@
 
           <div class="swatches">
             <label class="field color-field">
+              <span>Text border color</span>
+              <input id="subtitleBorderColor" type="color" value="#000000" />
+            </label>
+          </div>
+
+          <div class="swatches">
+            <label class="field color-field">
               <span>Highlighted word background color</span>
               <input id="highlightBackgroundColor" type="color" value="#FFB703" />
             </label>
@@ -107,6 +138,10 @@
 
           <button class="secondary-btn" id="downloadVtt" type="button" disabled>
             Download WebVTT
+          </button>
+
+          <button class="primary-btn secondary-action" id="downloadVideo" type="button" disabled>
+            Download video with subtitles
           </button>
 
           <div class="status-box">

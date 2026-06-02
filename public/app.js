@@ -8,13 +8,17 @@ const downloadVttButton = document.getElementById('downloadVtt');
 const transcribeButton = document.getElementById('transcribeBtn');
 const subtitleColorInput = document.getElementById('subtitleColor');
 const highlightColorInput = document.getElementById('highlightColor');
+const useActiveWordColorInput = document.getElementById('useActiveWordColor');
 const subtitleSizeInput = document.getElementById('subtitleSize');
 const subtitleOffsetInput = document.getElementById('subtitleOffset');
 const subtitleBackgroundInput = document.getElementById('subtitleBackground');
 const subtitleBorderInput = document.getElementById('subtitleBorder');
+const subtitleBorderColorInput = document.getElementById('subtitleBorderColor');
 const highlightBackgroundInput = document.getElementById('highlightBackground');
 const highlightBackgroundColorInput = document.getElementById('highlightBackgroundColor');
 const highlightBackgroundOpacityInput = document.getElementById('highlightBackgroundOpacity');
+const subtitleFontInput = document.getElementById('subtitleFont');
+const downloadVideoButton = document.getElementById('downloadVideo');
 
 const state = {
   objectUrl: null,
@@ -114,28 +118,34 @@ function renderSubtitle() {
   const activeWord = [...activeWords].reverse().find((word) => video.currentTime >= word.start) ?? activeWords[activeWords.length - 1];
   const subtitleColor = subtitleColorInput.value;
   const highlightColor = highlightColorInput.value;
+  const useActiveWordColor = useActiveWordColorInput.checked;
   const subtitleSize = subtitleSizeInput.value;
   const subtitleOffset = subtitleOffsetInput.value;
+  const subtitleFont = subtitleFontInput.value;
   const hasBackground = subtitleBackgroundInput.checked;
   const hasBorder = subtitleBorderInput.checked;
   const hasHighlightBackground = highlightBackgroundInput.checked;
   const highlightBackgroundColor = highlightBackgroundColorInput.value;
   const highlightBackgroundOpacity = Number(highlightBackgroundOpacityInput.value) / 100;
+  const subtitleBorderColor = subtitleBorderColorInput.value;
 
   const { red, green, blue } = hexToRgb(highlightBackgroundColor);
   const highlightBackground = hasHighlightBackground ? `rgba(${red}, ${green}, ${blue}, ${highlightBackgroundOpacity})` : 'transparent';
 
   subtitleLine.style.setProperty('--subtitle-size', `${subtitleSize}rem`);
   subtitleLine.style.setProperty('--subtitle-bottom', `${subtitleOffset}px`);
+  subtitleLine.style.setProperty('--subtitle-font', subtitleFont);
   subtitleLine.style.setProperty('--subtitle-background', hasBackground ? 'rgba(0, 0, 0, 0.42)' : 'transparent');
   subtitleLine.style.setProperty('--subtitle-border', hasBorder ? 'rgba(255, 255, 255, 0.22)' : 'transparent');
   subtitleLine.style.setProperty('--subtitle-shadow', hasBackground || hasBorder ? '0 16px 40px rgba(0, 0, 0, 0.3)' : 'none');
   subtitleLine.style.setProperty('--highlight-word-background', highlightBackground);
+  subtitleLine.style.setProperty('--subtitle-border-color', subtitleBorderColor);
 
   subtitleLine.innerHTML = cue.words
     .map((word) => {
       const className = word === activeWord ? 'subtitle-word active' : 'subtitle-word';
-      return `<span class="${className}" style="color:${word === activeWord ? highlightColor : subtitleColor}">${escapeHtml(word.text)}</span>`;
+      const wordColor = word === activeWord && useActiveWordColor ? highlightColor : subtitleColor;
+      return `<span class="${className}" style="color:${wordColor}">${escapeHtml(word.text)}</span>`;
     })
     .join('');
 }
@@ -151,13 +161,21 @@ function resetTranscript() {
 
 subtitleColorInput.addEventListener('input', renderSubtitle);
 highlightColorInput.addEventListener('input', renderSubtitle);
+useActiveWordColorInput.addEventListener('input', () => {
+  highlightColorInput.disabled = !useActiveWordColorInput.checked;
+  renderSubtitle();
+});
 subtitleSizeInput.addEventListener('input', renderSubtitle);
 subtitleOffsetInput.addEventListener('input', renderSubtitle);
 subtitleBackgroundInput.addEventListener('input', renderSubtitle);
 subtitleBorderInput.addEventListener('input', renderSubtitle);
+subtitleBorderColorInput.addEventListener('input', renderSubtitle);
 highlightBackgroundInput.addEventListener('input', renderSubtitle);
 highlightBackgroundColorInput.addEventListener('input', renderSubtitle);
 highlightBackgroundOpacityInput.addEventListener('input', renderSubtitle);
+subtitleFontInput.addEventListener('input', renderSubtitle);
+
+highlightColorInput.disabled = !useActiveWordColorInput.checked;
 
 fileInput.addEventListener('change', () => {
   const [file] = fileInput.files ?? [];
@@ -188,6 +206,58 @@ downloadVttButton.addEventListener('click', () => {
   }
 
   downloadText('subtitles.vtt', buildVtt(state.cues), 'text/vtt');
+});
+
+downloadVideoButton.addEventListener('click', async () => {
+  const [file] = fileInput.files ?? [];
+
+  if (!file || !state.cues.length) {
+    setStatus('Transcribe a video first, then download the subtitled video.');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('video', file);
+  formData.append('cues', JSON.stringify(state.cues));
+  formData.append('fontName', subtitleFontInput.value);
+  formData.append('fontSize', String(Math.round(Number(subtitleSizeInput.value) * 28)));
+  formData.append('subtitleColor', subtitleColorInput.value);
+  formData.append('activeWordColor', highlightColorInput.value);
+  formData.append('activeWordDifferentColor', String(useActiveWordColorInput.checked));
+  formData.append('borderColor', subtitleBorderColorInput.value);
+  formData.append('borderWidth', '2');
+  formData.append('showBackground', String(subtitleBackgroundInput.checked));
+  formData.append('showBorder', String(subtitleBorderInput.checked));
+
+  downloadVideoButton.disabled = true;
+  setStatus('Rendering the subtitled video. This may take a bit longer than the preview.');
+
+  try {
+    const response = await fetch('/api/render-video', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload?.error || 'Video rendering failed.');
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    const originalName = file.name.replace(/\.[^.]+$/, '');
+    anchor.href = objectUrl;
+    anchor.download = `${originalName}-subtitled.mp4`;
+    anchor.click();
+    URL.revokeObjectURL(objectUrl);
+    setStatus('Subtitled video is downloading.');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Video rendering failed.';
+    setStatus(message);
+  } finally {
+    downloadVideoButton.disabled = false;
+  }
 });
 
 form.addEventListener('submit', async (event) => {
@@ -225,6 +295,7 @@ form.addEventListener('submit', async (event) => {
 
     transcriptText.textContent = state.transcript || 'No speech was detected in this clip.';
     downloadVttButton.disabled = !state.words.length;
+    downloadVideoButton.disabled = !state.words.length;
     setStatus(`Transcription ready. ${state.words.length} words detected.`);
     renderSubtitle();
   } catch (error) {
